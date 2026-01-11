@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <title>Pure Black Audio</title>
+    
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1251/1251671.png">
+
+    <!-- LIBRARIES (Wajib konek internet saat pertama kali buka, setelah itu dicache browser) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;500;700;800&display=swap');
+        
+        :root {
+            --primary: #ffffff;
+            --accent: #3b82f6;
+            --accent-rgb: 59, 130, 246;
+            --bg-color: #000000;
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --title-glow: 20px;
+            --title-glow-str: 0.8;
+            --safe-top: env(safe-area-inset-top, 20px);
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            --safe-left: env(safe-area-inset-left, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: white;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            height: 100vh;
+            height: -webkit-fill-available;
+            width: 100vw;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        #bg-canvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        /* --- UI ELEMENTS --- */
+
+        .modern-dock {
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            border-radius: 32px;
+            transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transform: translateY(0);
+            opacity: 1;
+            margin-bottom: var(--safe-bottom);
+        }
+
+        .dock-hidden {
+            transform: translateY(calc(100% + var(--safe-bottom) + 50px)) !important;
+            opacity: 0 !important;
+            pointer-events: none;
+        }
+
+        .top-hidden {
+            transform: translateY(-200%) !important;
+            opacity: 0 !important;
+            pointer-events: none;
+        }
+
+        /* CENTERED MODAL FOR MAIN CONFIG */
+        #settings-panel {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.95);
+            width: 85vw; max-width: 320px;
+            background: rgba(15, 15, 20, 0.95);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            padding: 24px;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.7);
+        }
+        #settings-panel.open { 
+            opacity: 1; 
+            transform: translate(-50%, -50%) scale(1); 
+            pointer-events: auto; 
+        }
+
+        /* VIZ SETTINGS PILL */
+        .viz-pill {
+            background: rgba(10, 10, 12, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            position: absolute;
+            top: calc(var(--safe-top) + 70px); 
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            z-index: 40;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 20px;
+            width: 340px;
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+        .viz-pill.active { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+
+        /* --- TEXT STYLING (FIXED GLOW) --- */
+        #viz-container { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+        #art-canvas { position: absolute; inset: 0; }
+        
+        #text-info-container {
+            position: absolute; width: 100%; top: 40%; left: 0;
+            transform: translateY(-50%);
+            transition: top 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+            text-align: center; z-index: 10; padding: 0 2rem;
+        }
+
+        #track-title {
+            color: #ffffff;
+            line-height: 1.1;
+            text-shadow: 0 0 var(--title-glow) rgba(var(--accent-rgb), var(--title-glow-str)),
+                         0 0 calc(var(--title-glow) * 0.5) rgba(var(--accent-rgb), 0.4);
+            transition: text-shadow 0.3s ease;
+        }
+        
+        #viz-container.immersive #text-info-container { top: 50%; }
+
+        /* --- CONTROLS --- */
+        .btn-icon { transition: all 0.2s; color: rgba(255,255,255,0.6); }
+        .btn-icon:hover { color: white; background: rgba(255,255,255,0.08); }
+        .btn-icon:active { transform: scale(0.92); }
+
+        .btn-play { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .btn-play:hover { transform: scale(1.08); }
+        .btn-play:active { transform: scale(0.95); }
+
+        .btn-top {
+            width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            color: rgba(255,255,255,0.7);
+            transition: all 0.2s;
+        }
+        .btn-top:hover { background: rgba(255,255,255,0.15); color: white; transform: scale(1.05); }
+        .btn-top:active { transform: scale(0.95); }
+
+        /* SLIDERS */
+        input[type=range] { -webkit-appearance: none; background: transparent; cursor: pointer; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%;
+            background: white; margin-top: -5px; 
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 3px; background: #333; border-radius: 2px; }
+        #seek-slider::-webkit-slider-runnable-track { background: linear-gradient(to right, white 0%, white var(--progress, 0%), #333 var(--progress, 0%), #333 100%); }
+
+        /* PLAYLIST */
+        #playlist-drawer {
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            background: #050505; border-left: 1px solid #222;
+            padding-top: var(--safe-top); padding-bottom: var(--safe-bottom);
+        }
+        #playlist-drawer.closed { transform: translateX(100%); }
+        .playlist-item { border-bottom: 1px solid #111; }
+        .playlist-item.active { background: #111; color: white; }
+        .playlist-item.active .status-indicator { background-color: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+        .top-controls-wrapper {
+            position: absolute;
+            top: var(--safe-top); left: var(--safe-left); right: var(--safe-right);
+            padding: 16px 24px;
+            display: flex; justify-content: space-between; align-items: center;
+            pointer-events: auto; z-index: 30;
+            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.5s;
+        }
+        
+        .color-dot {
+            width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+            border: 2px solid rgba(0,0,0,0.2);
+        }
+        .color-dot:active { transform: scale(0.8); }
+
+        /* IMMERSIVE HINT */
+        #immersive-hint {
+            position: absolute; top: 20%; width: 100%;
+            text-align: center; pointer-events: none;
+            color: rgba(255,255,255,0.4); font-size: 10px;
+            text-transform: uppercase; letter-spacing: 2px;
+            opacity: 0; transition: opacity 0.5s;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body class="relative bg-black">
+
+    <!-- AUDIO ELEMENT UNTUK BACKGROUND PLAYBACK iOS -->
+    <audio id="hidden-player" playsinline preload="auto" crossorigin="anonymous"></audio>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="viz-container">
+        <canvas id="art-canvas"></canvas>
+        <div id="text-info-container">
+            <div id="player-status" class="text-[10px] font-mono text-blue-400 mb-2 opacity-0 transition-opacity">READY</div>
+            <h1 id="track-title" class="text-4xl md:text-7xl font-bold tracking-tight pb-2 break-words max-w-[90vw] mx-auto">NO AUDIO</h1>
+            <p id="track-artist" class="text-xs md:text-sm font-bold text-gray-400 mt-4 tracking-[0.3em] uppercase">Select Local File</p>
+            <p id="track-album" class="text-[10px] md:text-xs font-medium text-gray-600 mt-2 tracking-widest uppercase opacity-0 transition-opacity duration-500">Unknown Album</p>
+        </div>
+    </div>
+
+    <div id="immersive-hint">4x Tap to show controls</div>
+
+    <input type="color" id="custom-theme-picker" class="absolute opacity-0 pointer-events-none -z-10">
+
+    <div id="settings-panel">
+        <div class="flex justify-between items-center border-b border-white/10 pb-3 mb-4">
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Main Config</span>
+            <button id="close-settings" class="text-gray-500 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+        <div class="space-y-6">
+            <div>
+                <div class="flex justify-between text-xs mb-2 text-gray-400"><span>Master Volume</span><span id="vol-display" class="font-mono text-[10px] text-blue-400">100%</span></div>
+                <input type="range" id="vol-slider" min="0" max="100" value="100" class="w-full">
+            </div>
+            <!-- Crossfade disabled for iOS Audio Element Stability -->
+            <div class="opacity-50 pointer-events-none">
+                <div class="flex justify-between text-xs mb-2 text-gray-400"><span>Crossfade (Disabled on iOS)</span><span id="cf-display" class="font-mono text-[10px] text-blue-400">OFF</span></div>
+                <input type="range" id="cf-slider" min="0" max="30" value="0" class="w-full">
+            </div>
+            <div class="pt-2 flex gap-3">
+                <button id="btn-save-cfg" class="flex-1 bg-white/10 hover:bg-white/20 text-xs py-3 rounded-lg text-white transition font-medium">Save</button>
+                <button id="btn-reset-cfg" class="flex-1 bg-red-500/10 hover:bg-red-500/20 text-xs py-3 rounded-lg text-red-400 transition font-medium">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="viz-settings-pill" class="viz-pill custom-scrollbar">
+        <div class="flex justify-between items-center border-b border-white/10 pb-2 mb-1">
+            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Visualizer Tuning</span>
+            <button id="close-viz-pill" class="text-gray-500 hover:text-white"><i data-lucide="x" class="w-3 h-3"></i></button>
+        </div>
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                 <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Curve</span><span id="curve-display" class="font-mono text-[10px] text-blue-400">2.5</span></div><input type="range" id="curve-slider" min="10" max="150" value="25" class="w-full"></div>
+                 <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Sensitivity</span><span id="pill-sens-display" class="font-mono text-[10px] text-blue-400">2.5x</span></div><input type="range" id="pill-sens-slider" min="5" max="50" value="25" class="w-full"></div>
+            </div>
+            <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Bounciness</span><span id="bounce-display" class="font-mono text-[10px] text-blue-400">Normal</span></div><input type="range" id="bounce-slider" min="0" max="100" value="50" class="w-full"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Inner Radius</span><span id="inner-radius-display" class="font-mono text-[10px] text-blue-400">12%</span></div><input type="range" id="inner-radius-slider" min="5" max="30" value="12" class="w-full"></div>
+                <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Bar Length</span><span id="bar-len-display" class="font-mono text-[10px] text-blue-400">100%</span></div><input type="range" id="bar-len-slider" min="10" max="250" value="100" class="w-full"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Bar Count</span><span id="bar-cnt-display" class="font-mono text-[10px] text-blue-400">80</span></div><input type="range" id="bar-cnt-slider" min="32" max="180" step="4" value="80" class="w-full"></div>
+                <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Rotate Speed</span><span id="rot-speed-display" class="font-mono text-[10px] text-blue-400">1.0x</span></div><input type="range" id="rot-speed-slider" min="0" max="50" step="1" value="10" class="w-full"></div>
+            </div>
+            <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Freq Focus</span><span id="freq-display" class="font-mono text-[10px] text-blue-400">Sub Bass</span></div><input type="range" id="freq-slider" min="5" max="60" value="15" class="w-full"></div>
+            <div class="border-t border-white/10 pt-2">
+                <p class="text-[10px] font-bold text-gray-500 uppercase mb-2">Glow Effects</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Blur Radius</span><span id="glow-rad-display" class="font-mono text-[10px] text-blue-400">15px</span></div><input type="range" id="glow-rad-slider" min="0" max="50" value="15" class="w-full"></div>
+                    <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Intensity</span><span id="glow-str-display" class="font-mono text-[10px] text-blue-400">0.6</span></div><input type="range" id="glow-str-slider" min="0" max="100" value="60" class="w-full"></div>
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                    <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Title Radius</span><span id="title-glow-display" class="font-mono text-[10px] text-blue-400">20px</span></div><input type="range" id="title-glow-slider" min="0" max="100" value="20" class="w-full"></div>
+                    <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Title Intensity</span><span id="title-glow-str-display" class="font-mono text-[10px] text-blue-400">0.8</span></div><input type="range" id="title-glow-str-slider" min="0" max="100" value="80" class="w-full"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="top-controls" class="top-controls-wrapper">
+        <div class="flex gap-4 items-center">
+             <div id="theme-red" class="color-dot bg-red-500 hover:bg-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]"></div>
+             <div id="theme-yellow" class="color-dot bg-yellow-500 hover:bg-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.4)]"></div>
+             <div id="theme-green" class="color-dot bg-green-500 hover:bg-green-400 shadow-[0_0_15px_rgba(34,197,94,0.4)]"></div>
+        </div>
+        <div class="flex gap-3">
+            <button id="btn-toggle-viz" class="btn-top" title="Tune Visualizer">
+                <i data-lucide="activity" class="w-5 h-5"></i>
+            </button>
+            <button id="btn-settings" class="btn-top" title="Main Config">
+                <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
+            </button>
+            <label class="btn-top cursor-pointer" title="Add Music">
+                <i data-lucide="folder-plus" class="w-5 h-5"></i>
+                <input type="file" id="file-input" multiple class="hidden">
+            </label>
+            <button id="btn-toggle-dock" class="btn-top" title="Toggle UI">
+                <i id="icon-toggle-dock" data-lucide="eye-off" class="w-5 h-5"></i>
+            </button>
+            <button id="btn-playlist-toggle" class="btn-top" title="Playlist">
+                <i data-lucide="list-music" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="absolute inset-0 z-20 flex flex-col justify-end pointer-events-none p-4 md:p-10">
+        <div class="w-full flex justify-center pointer-events-auto relative">
+            <div id="main-dock" class="modern-dock px-6 py-6 w-full max-w-xl flex flex-col gap-5 relative">
+                <div class="flex items-center gap-4 text-[11px] font-mono text-gray-500">
+                    <span id="current-time" class="w-10 text-right">0:00</span>
+                    <input type="range" id="seek-slider" min="0" max="100" value="0" class="flex-grow h-1 opacity-80 hover:opacity-100 transition cursor-pointer">
+                    <span id="total-duration" class="w-10">0:00</span>
+                </div>
+                <div class="flex justify-between items-center px-4">
+                    <button id="btn-shuffle" class="btn-icon p-2 rounded-full"><i data-lucide="shuffle" class="w-5 h-5"></i></button>
+                    <div class="flex items-center gap-6">
+                        <button id="btn-prev" class="btn-icon p-2 rounded-full hover:text-white text-gray-400"><i data-lucide="skip-back" class="w-8 h-8 fill-current"></i></button>
+                        <button id="btn-play" class="btn-play w-16 h-16 rounded-full bg-white text-black flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.2)]"><i data-lucide="play" class="w-8 h-8 fill-current ml-1"></i></button>
+                        <button id="btn-next" class="btn-icon p-2 rounded-full hover:text-white text-gray-400"><i data-lucide="skip-forward" class="w-8 h-8 fill-current"></i></button>
+                    </div>
+                    <button id="btn-repeat" class="btn-icon p-2 rounded-full relative">
+                        <i data-lucide="repeat" class="w-5 h-5"></i>
+                        <div id="repeat-dot" class="absolute top-2 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full hidden shadow-[0_0_5px_#3b82f6]"></div>
+                        <span id="repeat-one" class="absolute -top-1 -right-1 text-[9px] font-bold text-white hidden">1</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="playlist-drawer" class="fixed inset-y-0 right-0 w-80 max-w-[90vw] z-50 flex flex-col closed pointer-events-auto shadow-2xl">
+        <div class="p-6 border-b border-gray-900 flex justify-between items-center bg-black">
+            <h2 class="font-bold text-white text-xs tracking-widest uppercase">Queue</h2>
+            <button id="btn-close-playlist" class="text-gray-500 hover:text-white transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+        <div id="playlist-container" class="flex-grow overflow-y-auto custom-scrollbar">
+            <div class="h-full flex flex-col items-center justify-center text-gray-700 text-center p-6 space-y-4">
+                <div class="w-16 h-16 rounded-full border border-gray-800 flex items-center justify-center"><i data-lucide="music" class="w-6 h-6 opacity-30"></i></div>
+                <p class="text-xs uppercase tracking-widest">No Tracks</p>
+                <p class="text-[10px] text-gray-500">Use Top Right Folder to add files</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = ""; 
+
+        let config = { 
+            themeColor: '#ffffff', 
+            viz: { 
+                sensitivity: 2.5, smoothing: 0.6, bars: 80, freqRange: 15, innerRadius: 0.12, barScale: 1.0, 
+                rotationSpeed: 0.0002, power: 2.5, glowRadius: 15, glowStrength: 0.6
+            }, 
+            crossfade: { active: false, duration: 0 },
+            volume: 1.0, titleGlow: 20, titleGlowStrength: 0.8
+        };
+        const state = { playlist: [], currentIndex: -1, isPlaying: false, repeat: 0, shuffle: false, ctx: null, source: null, gain: null, masterGain: null, analyser: null, startTime: 0, duration: 0, triggeredNext: false, loading: false, dockHidden: false, currentVizY: 0.42, rotation: 0, vizPillOpen: false, draggedItem: null };
+        
+        const $ = (id) => document.getElementById(id);
+        const els = {
+            title: $('track-title'), artist: $('track-artist'), album: $('track-album'), status: $('player-status'),
+            playBtn: $('btn-play'), prevBtn: $('btn-prev'), nextBtn: $('btn-next'), seek: $('seek-slider'), curTime: $('current-time'), durTime: $('total-duration'),
+            playlistDrawer: $('playlist-drawer'), playlistContainer: $('playlist-container'), bgCanvas: $('bg-canvas'), artCanvas: $('art-canvas'),
+            fileInput: $('file-input'), settingsPanel: $('settings-panel'), mainDock: $('main-dock'), topControls: $('top-controls'),
+            toggleDockBtn: $('btn-toggle-dock'), toggleDockIcon: $('icon-toggle-dock'), hint: $('immersive-hint'),
+            toggleVizBtn: $('btn-toggle-viz'), vizPill: $('viz-settings-pill'), closeVizPill: $('close-viz-pill'),
+            vizContainer: $('viz-container'), customPicker: $('custom-theme-picker'),
+            audioPlayer: $('hidden-player')
+        };
+
+        lucide.createIcons();
+
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.slice(1), 16);
+            const r = (bigint >> 16) & 255;
+            const g = (bigint >> 8) & 255;
+            const b = bigint & 255;
+            return `${r}, ${g}, ${b}`;
+        }
+
+        function updateTheme(hex) {
+            config.themeColor = hex; 
+            document.documentElement.style.setProperty('--accent', hex);
+            document.documentElement.style.setProperty('--accent-rgb', hexToRgb(hex));
+            const dot = $('repeat-dot'); if(dot) { dot.style.boxShadow = `0 0 5px ${hex}`; dot.style.backgroundColor = hex; }
+        }
+
+        // --- NEW TAP LOGIC (Fixes 1x 2x 3x) ---
+        function attachTapListener(id, hex) {
+            const btn = $(id);
+            if (!btn) return;
+            
+            let tapCount = 0;
+            let tapTimer = null;
+
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                tapCount++;
+                if (tapTimer) clearTimeout(tapTimer);
+                tapTimer = setTimeout(() => {
+                    if (tapCount === 1) updateTheme(hex);
+                    else if (tapCount === 2) updateTheme('#ffffff');
+                    else if (tapCount >= 3) els.customPicker.click();
+                    tapCount = 0;
+                }, 300);
+            });
+        }
+
+        attachTapListener('theme-red', '#ef4444');
+        attachTapListener('theme-yellow', '#eab308');
+        attachTapListener('theme-green', '#22c55e');
+
+        if(els.customPicker) els.customPicker.addEventListener('input', (e) => updateTheme(e.target.value));
+
+        function saveConfig() {
+            localStorage.setItem('pba_config', JSON.stringify(config));
+            setStatus("CONFIG SAVED");
+            setTimeout(() => setStatus(""), 2000);
+        }
+
+        function loadConfig() {
+            const saved = localStorage.getItem('pba_config');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    Object.assign(config, parsed);
+                    applyConfigToUI();
+                    updateTheme(config.themeColor);
+                } catch (e) { console.error("Config Load Error", e); }
+            }
+        }
+
+        function applyConfigToUI() {
+            if($('curve-slider')) { $('curve-slider').value = config.viz.power * 10; $('curve-display').innerText = config.viz.power.toFixed(1); }
+            if($('inner-radius-slider')) { $('inner-radius-slider').value = config.viz.innerRadius * 100; $('inner-radius-display').innerText = (config.viz.innerRadius * 100) + '%'; }
+            if($('bar-len-slider')) { $('bar-len-slider').value = config.viz.barScale * 100; $('bar-len-display').innerText = (config.viz.barScale * 100) + '%'; }
+            if($('bar-cnt-slider')) { $('bar-cnt-slider').value = config.viz.bars; $('bar-cnt-display').innerText = config.viz.bars; }
+            if($('rot-speed-slider')) $('rot-speed-slider').value = config.viz.rotationSpeed * 10000 / 2;
+            if($('freq-slider')) { $('freq-slider').value = config.viz.freqRange; $('freq-display').innerText = config.viz.freqRange < 20 ? "Sub Bass" : "Low Mid"; }
+            if($('bounce-slider')) { const smoothVal = Math.round((0.95 - config.viz.smoothing) * 100 / 0.95); $('bounce-slider').value = smoothVal; $('bounce-display').innerText = smoothVal < 30 ? "Smooth" : (smoothVal > 70 ? "Twitchy" : "Normal"); }
+            if($('pill-sens-slider')) { $('pill-sens-slider').value = config.viz.sensitivity * 10; $('pill-sens-display').innerText = config.viz.sensitivity + 'x'; }
+            if($('vol-slider')) { $('vol-slider').value = config.volume * 100; $('vol-display').innerText = Math.round(config.volume * 100) + '%'; }
+            if($('glow-rad-slider')) { $('glow-rad-slider').value = config.viz.glowRadius; $('glow-rad-display').innerText = config.viz.glowRadius + 'px'; }
+            if($('glow-str-slider')) { $('glow-str-slider').value = config.viz.glowStrength * 100; $('glow-str-display').innerText = config.viz.glowStrength.toFixed(1); }
+            if($('title-glow-slider')) { $('title-glow-slider').value = config.titleGlow || 20; $('title-glow-display').innerText = (config.titleGlow || 20) + 'px'; }
+            
+            const str = config.titleGlowStrength !== undefined ? config.titleGlowStrength : 0.8;
+            if($('title-glow-str-slider')) { $('title-glow-str-slider').value = str * 100; $('title-glow-str-display').innerText = str.toFixed(1); }
+            
+            document.documentElement.style.setProperty('--title-glow', (config.titleGlow || 20) + 'px');
+            document.documentElement.style.setProperty('--title-glow-str', str);
+            
+            // Apply volume
+            if(els.audioPlayer) els.audioPlayer.volume = config.volume;
+        }
+
+        // --- CORE AUDIO LOGIC (UPDATED FOR iOS BACKGROUND) ---
+        function initAudio() {
+            if (!state.ctx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                state.ctx = new AudioContext();
+                
+                // Use MediaElementSource (HTML5 Audio) - Key for iOS Background
+                if(!state.source) {
+                    state.source = state.ctx.createMediaElementSource(els.audioPlayer);
+                    state.analyser = state.ctx.createAnalyser();
+                    state.analyser.fftSize = 2048;
+                    state.analyser.smoothingTimeConstant = config.viz.smoothing;
+                    
+                    // Connect Source -> Analyser -> Destination
+                    state.source.connect(state.analyser);
+                    state.analyser.connect(state.ctx.destination);
+                }
+                
+                startVisualizer();
+            }
+            if (state.ctx.state === 'suspended') state.ctx.resume();
+        }
+        
+        // Setup initial interaction to unlock audio
+        document.body.addEventListener('click', initAudio, { once: true });
+        document.body.addEventListener('touchstart', initAudio, { once: true });
+
+        // Native Audio Event Listeners for UI Sync
+        els.audioPlayer.addEventListener('timeupdate', () => {
+            if(!state.isPlaying) return;
+            const cur = els.audioPlayer.currentTime;
+            const dur = els.audioPlayer.duration;
+            if(isNaN(dur)) return;
+            
+            if(document.activeElement !== els.seek) {
+                const pct = (cur / dur) * 100;
+                els.seek.value = pct; 
+                els.seek.style.setProperty('--progress', `${pct}%`);
+                els.curTime.innerText = formatTime(cur);
+            }
+            els.durTime.innerText = formatTime(dur);
+        });
+
+        els.audioPlayer.addEventListener('ended', () => {
+            nextTrack(true);
+        });
+        
+        els.audioPlayer.addEventListener('pause', () => {
+            state.isPlaying = false;
+            updateControls();
+        });
+        
+        els.audioPlayer.addEventListener('play', () => {
+            state.isPlaying = true;
+            updateControls();
+        });
+
+        function setStatus(msg) {
+            if (els.status) { els.status.innerText = msg; els.status.style.opacity = msg ? 1 : 0; }
+        }
+
+        function updateMediaSession(title, artist, album) {
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: title || 'Unknown Title',
+                    artist: artist || 'Unknown Artist',
+                    album: album || 'Local Audio',
+                    artwork: [{ src: 'https://cdn-icons-png.flaticon.com/512/109/109197.png', sizes: '512x512', type: 'image/png' }]
+                });
+                navigator.mediaSession.setActionHandler('play', () => { els.audioPlayer.play(); });
+                navigator.mediaSession.setActionHandler('pause', () => { els.audioPlayer.pause(); });
+                navigator.mediaSession.setActionHandler('previoustrack', () => { let prev = state.currentIndex - 1; if(prev < 0) prev = state.playlist.length - 1; playTrack(prev); });
+                navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack(false));
+                navigator.mediaSession.setActionHandler('seekto', (details) => { els.audioPlayer.currentTime = details.seekTime; });
+            }
+        }
+
+        function updateInfo(file) {
+            const cleanName = file.name.replace(/\.[^/.]+$/, "");
+            els.title.innerText = cleanName; els.artist.innerText = "Unknown Artist"; els.album.innerText = ""; els.album.classList.add('opacity-0');
+            
+            let meta = { title: cleanName, artist: 'Unknown Artist', album: 'Local Audio' };
+
+            if (window.jsmediatags) {
+                window.jsmediatags.read(file, {
+                    onSuccess: function(tag) {
+                        if (tag.tags.title) { els.title.innerText = tag.tags.title; meta.title = tag.tags.title; }
+                        if (tag.tags.artist) { els.artist.innerText = tag.tags.artist; meta.artist = tag.tags.artist; }
+                        if (tag.tags.album) { els.album.innerText = tag.tags.album; els.album.classList.remove('opacity-0'); meta.album = tag.tags.album; }
+                        updateMediaSession(meta.title, meta.artist, meta.album);
+                    },
+                    onError: () => { updateMediaSession(meta.title, meta.artist, meta.album); }
+                });
+            } else { updateMediaSession(meta.title, meta.artist, meta.album); }
+        }
+
+        async function playTrack(index, offset = 0) {
+            initAudio();
+            if (index < 0 || index >= state.playlist.length) return;
+            
+            // If dragging same track, just seek if needed, else ignore
+            if (state.currentIndex === index && offset === 0 && state.isPlaying) return;
+            
+            state.loading = true; setStatus("LOADING...");
+            const file = state.playlist[index];
+            
+            if(state.currentIndex !== index) { 
+                // Revoke old object url to free memory
+                if(state.currentUrl) URL.revokeObjectURL(state.currentUrl);
+                
+                updateInfo(file); 
+                state.currentIndex = index; 
+                renderPlaylist(); 
+                
+                state.currentUrl = URL.createObjectURL(file);
+                els.audioPlayer.src = state.currentUrl;
+                els.audioPlayer.load();
+            }
+
+            els.playBtn.innerHTML = `<div class="w-6 h-6 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>`;
+            
+            try {
+                if(offset > 0) els.audioPlayer.currentTime = offset;
+                
+                await els.audioPlayer.play();
+                
+                state.isPlaying = true;
+                state.loading = false;
+                state.triggeredNext = false;
+                
+                setStatus("PLAYING");
+                updateControls(); 
+                setTimeout(() => setStatus(""), 2000);
+
+            } catch (err) {
+                console.error("Playback Error:", err); setStatus("ERROR"); state.isPlaying = false; state.loading = false; updateControls(); 
+                // Auto-play policy error might happen if not interacted
+            }
+        }
+
+        function togglePlay() {
+            if(els.audioPlayer.paused) {
+                els.audioPlayer.play();
+                if(state.currentIndex === -1 && state.playlist.length > 0) playTrack(0);
+            } else {
+                els.audioPlayer.pause();
+            }
+        }
+
+        function nextTrack(auto = false) {
+            let next = state.currentIndex + 1;
+            if (state.repeat === 2 && auto) {
+                // Repeat One - Reset time
+                els.audioPlayer.currentTime = 0;
+                els.audioPlayer.play();
+                return;
+            }
+            else if (state.shuffle) next = Math.floor(Math.random() * state.playlist.length);
+            
+            if (next >= state.playlist.length) {
+                if (state.repeat > 0) next = 0;
+                else return; // Stop at end
+            }
+            playTrack(next);
+        }
+
+        function startVisualizer() {
+            const artCtx = els.artCanvas.getContext('2d'); const bgCtx = els.bgCanvas.getContext('2d');
+            const dataArray = new Uint8Array(state.analyser.frequencyBinCount);
+            function resize() { els.bgCanvas.width = window.innerWidth; els.bgCanvas.height = window.innerHeight; els.artCanvas.width = window.innerWidth; els.artCanvas.height = window.innerHeight; }
+            window.addEventListener('resize', resize); resize();
+            
+            function draw() {
+                requestAnimationFrame(draw);
+                if (state.analyser) state.analyser.smoothingTimeConstant = config.viz.smoothing;
+                
+                // Get Data
+                state.analyser.getByteFrequencyData(dataArray);
+                
+                const w = window.innerWidth; const h = window.innerHeight;
+                const targetY = state.dockHidden ? 0.5 : 0.42; 
+                state.currentVizY += (targetY - state.currentVizY) * 0.05; 
+                const cx = w / 2; const cy = h * state.currentVizY;
+                
+                artCtx.clearRect(0, 0, w, h); bgCtx.clearRect(0, 0, w, h);
+                let bassSum = 0; for(let i=0; i<4; i++) bassSum += dataArray[i]; const bassAvg = (bassSum / 4) / 255;
+                const pulseOp = (bassAvg * 0.2 * config.viz.sensitivity);
+                bgCtx.fillStyle = `rgba(255, 255, 255, ${Math.min(pulseOp, 0.1)})`; bgCtx.beginPath(); bgCtx.arc(cx, cy, w * 0.4, 0, Math.PI * 2); bgCtx.fill();
+                const minDim = Math.min(w, h); const baseInnerRadius = minDim * config.viz.innerRadius; const innerKick = Math.pow(bassAvg, 3) * (minDim * 0.05) * config.viz.sensitivity; const currentInnerRadius = baseInnerRadius + innerKick;
+                const barRadius = currentInnerRadius; const extraBarKick = Math.pow(bassAvg, 4) * 20 * config.viz.sensitivity; const barCount = config.viz.bars; const step = (Math.PI * 2) / barCount; const maxBin = parseInt(config.viz.freqRange);
+                state.rotation += config.viz.rotationSpeed; artCtx.translate(cx, cy); artCtx.rotate(state.rotation); artCtx.strokeStyle = 'white'; artCtx.lineCap = 'round';
+                artCtx.shadowBlur = config.viz.glowRadius; artCtx.shadowColor = config.themeColor === '#ffffff' ? `rgba(255,255,255,${config.viz.glowStrength})` : config.themeColor;
+                for (let i = 0; i < barCount; i++) {
+                    const dataIndex = Math.floor((i / barCount) * maxBin); const val = dataArray[dataIndex] / 255;
+                    const barH = (Math.pow(val, config.viz.power) * (Math.min(w,h) * 0.25) * config.viz.sensitivity * config.viz.barScale) + extraBarKick;
+                    artCtx.save(); artCtx.rotate(i * step);
+                    if (barH > 2) {
+                        artCtx.beginPath(); artCtx.moveTo(0, barRadius); artCtx.lineTo(0, barRadius + barH); artCtx.lineWidth = 1 + (val * 3);
+                        if (config.themeColor === '#ffffff') artCtx.strokeStyle = `rgba(255, 255, 255, ${val * 0.9})`; else { artCtx.strokeStyle = val > 0.8 ? `rgba(255, 255, 255, ${val})` : config.themeColor; if(val <= 0.8) artCtx.globalAlpha = val; }
+                        artCtx.stroke(); artCtx.globalAlpha = 1;
+                        if(val > 0.5) { artCtx.beginPath(); artCtx.moveTo(0, barRadius - 5); artCtx.lineTo(0, barRadius - 5 - (barH * 0.2)); artCtx.strokeStyle = `rgba(255, 255, 255, 0.2)`; artCtx.stroke(); }
+                    }
+                    artCtx.restore();
+                }
+                artCtx.shadowBlur = 0; 
+                artCtx.beginPath(); artCtx.arc(0, 0, currentInnerRadius, 0, Math.PI * 2); artCtx.fillStyle = '#000000'; artCtx.fill();
+                artCtx.beginPath(); artCtx.arc(0, 0, currentInnerRadius, 0, Math.PI * 2); artCtx.strokeStyle = config.themeColor === '#ffffff' ? `rgba(255, 255, 255, ${0.1 + bassAvg * 0.3})` : config.themeColor; artCtx.lineWidth = 2; artCtx.stroke(); artCtx.setTransform(1, 0, 0, 1, 0, 0); 
+            }
+            draw();
+        }
+
+        function updateControls() {
+            els.playBtn.innerHTML = !els.audioPlayer.paused 
+                ? `<i data-lucide="pause" class="w-8 h-8 fill-current"></i>`
+                : `<i data-lucide="play" class="w-8 h-8 fill-current ml-1"></i>`;
+            lucide.createIcons();
+            $('repeat-dot').classList.toggle('hidden', state.repeat === 0);
+            $('repeat-one').classList.toggle('hidden', state.repeat !== 2);
+            $('btn-shuffle').classList.toggle('text-white', state.shuffle);
+            $('btn-shuffle').classList.toggle('text-gray-400', !state.shuffle);
+        }
+
+        function renderPlaylist() {
+            els.playlistContainer.innerHTML = '';
+            state.playlist.forEach((f, i) => {
+                const div = document.createElement('div');
+                div.className = `playlist-item p-4 cursor-pointer flex justify-between items-center transition hover:bg-white/5 ${i === state.currentIndex ? 'active' : ''}`;
+                div.setAttribute('draggable', 'true'); div.dataset.index = i;
+                div.innerHTML = `<div class="flex items-center gap-3 overflow-hidden pointer-events-none"><div class="status-indicator w-2 h-2 rounded-full bg-gray-800 transition-colors"></div><span class="truncate text-sm font-medium ${i === state.currentIndex ? 'text-white' : 'text-gray-400'}">${f.name}</span></div>`;
+                div.onclick = (e) => { if(!state.draggedItem) playTrack(i); };
+                div.addEventListener('dragstart', (e) => { state.draggedItem = i; e.target.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+                div.addEventListener('dragend', (e) => { e.target.classList.remove('dragging'); document.querySelectorAll('.playlist-item').forEach(el => el.classList.remove('drag-over')); state.draggedItem = null; });
+                div.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.target.closest('.playlist-item').classList.add('drag-over'); });
+                div.addEventListener('dragleave', (e) => { e.target.closest('.playlist-item').classList.remove('drag-over'); });
+                div.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); const targetIndex = i; const draggedIndex = state.draggedItem; if (draggedIndex !== null && draggedIndex !== targetIndex) { const itemToMove = state.playlist[draggedIndex]; state.playlist.splice(draggedIndex, 1); state.playlist.splice(targetIndex, 0, itemToMove); if (state.currentIndex === draggedIndex) state.currentIndex = targetIndex; else if (state.currentIndex > draggedIndex && state.currentIndex <= targetIndex) state.currentIndex--; else if (state.currentIndex < draggedIndex && state.currentIndex >= targetIndex) state.currentIndex++; renderPlaylist(); } });
+                els.playlistContainer.appendChild(div);
+            });
+        }
+
+        function formatTime(s) { if(isNaN(s)) return "0:00"; const m = Math.floor(s / 60); const sc = Math.floor(s % 60); return `${m}:${sc < 10 ? '0' : ''}${sc}`; }
+
+        if($('freq-slider')) $('freq-slider').addEventListener('input', (e) => { config.viz.freqRange = parseInt(e.target.value); $('freq-display').innerText = config.viz.freqRange < 20 ? "Sub Bass" : "Low Mid"; });
+        if($('inner-radius-slider')) $('inner-radius-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.viz.innerRadius = val / 100; $('inner-radius-display').innerText = val + '%'; });
+        if($('bar-len-slider')) $('bar-len-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.viz.barScale = val / 100; $('bar-len-display').innerText = val + '%'; });
+        if($('bar-cnt-slider')) $('bar-cnt-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.viz.bars = val; $('bar-cnt-display').innerText = val; });
+        if($('rot-speed-slider')) $('rot-speed-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.viz.rotationSpeed = val * 0.0001; $('rot-speed-display').innerText = (val * 0.1).toFixed(1) + 'x'; });
+        if($('vol-slider')) $('vol-slider').addEventListener('input', (e) => { const val = parseFloat(e.target.value); config.volume = val / 100; $('vol-display').innerText = val + '%'; els.audioPlayer.volume = config.volume; });
+        if($('curve-slider')) $('curve-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.viz.power = val / 10; $('curve-display').innerText = config.viz.power.toFixed(1); });
+        if($('pill-sens-slider')) $('pill-sens-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.viz.sensitivity = val / 10; $('pill-sens-display').innerText = config.viz.sensitivity + 'x'; });
+        if($('glow-rad-slider')) $('glow-rad-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.viz.glowRadius = val; $('glow-rad-display').innerText = val + 'px'; });
+        if($('glow-str-slider')) $('glow-str-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.viz.glowStrength = val / 100; $('glow-str-display').innerText = config.viz.glowStrength.toFixed(1); });
+        if($('title-glow-slider')) $('title-glow-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.titleGlow = val; $('title-glow-display').innerText = val + 'px'; document.documentElement.style.setProperty('--title-glow', val + 'px'); });
+        if($('title-glow-str-slider')) $('title-glow-str-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.titleGlowStrength = val / 100; $('title-glow-str-display').innerText = config.titleGlowStrength.toFixed(1); document.documentElement.style.setProperty('--title-glow-str', config.titleGlowStrength); });
+        if($('bounce-slider')) $('bounce-slider').addEventListener('input', (e) => { const val = parseInt(e.target.value); config.viz.smoothing = 0.95 - (val / 100) * 0.95; $('bounce-display').innerText = val < 30 ? "Smooth" : (val > 70 ? "Twitchy" : "Normal"); });
+
+        if($('btn-save-cfg')) $('btn-save-cfg').addEventListener('click', saveConfig);
+        if($('btn-reset-cfg')) $('btn-reset-cfg').addEventListener('click', () => { localStorage.removeItem('pba_config'); location.reload(); });
+
+        els.seek.addEventListener('input', (e) => { const pct = parseFloat(e.target.value); const dur = els.audioPlayer.duration; if(dur) { const time = (pct / 100) * dur; els.curTime.innerText = formatTime(time); els.seek.style.setProperty('--progress', `${pct}%`); } });
+        els.seek.addEventListener('change', (e) => { const pct = parseFloat(e.target.value); const dur = els.audioPlayer.duration; if(dur) { els.audioPlayer.currentTime = (pct / 100) * dur; } });
+        
+        $('btn-settings').addEventListener('click', (e) => { e.stopPropagation(); els.settingsPanel.classList.toggle('open'); });
+        $('close-settings').addEventListener('click', (e) => { e.stopPropagation(); els.settingsPanel.classList.remove('open'); });
+        document.addEventListener('click', (e) => { if (els.settingsPanel.classList.contains('open') && !els.settingsPanel.contains(e.target) && !e.target.closest('#btn-settings')) els.settingsPanel.classList.remove('open'); });
+        
+        function toggleUI() {
+            state.dockHidden = !state.dockHidden; 
+            els.mainDock.classList.toggle('dock-hidden', state.dockHidden); 
+            els.topControls.classList.toggle('top-hidden', state.dockHidden); 
+            els.vizContainer.classList.toggle('immersive', state.dockHidden); 
+            els.toggleDockIcon.setAttribute('data-lucide', state.dockHidden ? 'eye' : 'eye-off'); 
+            
+            if (state.dockHidden) {
+                els.hint.style.opacity = '1';
+                setTimeout(() => { els.hint.style.opacity = '0'; }, 3000);
+            } else els.hint.style.opacity = '0';
+            lucide.createIcons();
+        }
+
+        els.toggleDockBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleUI(); });
+        
+        // --- 4x TAP GESTURE LOGIC ---
+        let bodyTapCount = 0;
+        let bodyTapTimer = null;
+        document.body.addEventListener('click', (e) => {
+            if(state.dockHidden && !e.target.closest('button') && !e.target.closest('input')) {
+                bodyTapCount++;
+                if(bodyTapTimer) clearTimeout(bodyTapTimer);
+                bodyTapTimer = setTimeout(() => {
+                    // Reset if not 4 taps quickly
+                    if(bodyTapCount === 4) toggleUI();
+                    bodyTapCount = 0;
+                }, 400); // 400ms window
+            }
+        });
+
+        els.toggleVizBtn.addEventListener('click', (e) => { e.stopPropagation(); state.vizPillOpen = !state.vizPillOpen; els.vizPill.classList.toggle('active', state.vizPillOpen); });
+        els.closeVizPill.addEventListener('click', () => { state.vizPillOpen = false; els.vizPill.classList.remove('active'); });
+
+        $('btn-playlist-toggle').addEventListener('click', () => els.playlistDrawer.classList.remove('closed'));
+        $('btn-close-playlist').addEventListener('click', () => els.playlistDrawer.classList.add('closed'));
+        els.playBtn.addEventListener('click', togglePlay);
+        els.nextBtn.addEventListener('click', () => nextTrack(false));
+        els.prevBtn.addEventListener('click', () => { let prev = state.currentIndex - 1; if(prev < 0) prev = state.playlist.length - 1; playTrack(prev); });
+        $('btn-repeat').addEventListener('click', () => { state.repeat = (state.repeat + 1) % 3; updateControls(); });
+        $('btn-shuffle').addEventListener('click', () => { state.shuffle = !state.shuffle; updateControls(); });
+
+        els.fileInput.addEventListener('change', (e) => { const files = Array.from(e.target.files); if (files.length === 0) return; const wasEmpty = state.playlist.length === 0; state.playlist = [...state.playlist, ...files]; renderPlaylist(); els.playlistDrawer.classList.remove('closed'); if (wasEmpty || (!state.isPlaying && state.currentIndex === -1)) playTrack(state.playlist.length - files.length); els.fileInput.value = ''; });
+        document.body.addEventListener('dragover', e => e.preventDefault());
+        document.body.addEventListener('drop', e => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); if(files.length) { const wasEmpty = state.playlist.length === 0; state.playlist = [...state.playlist, ...files]; renderPlaylist(); els.playlistDrawer.classList.remove('closed'); if(wasEmpty || (!state.isPlaying && state.currentIndex === -1)) playTrack(state.playlist.length - files.length); } });
+
+        loadConfig();
+    </script>
+</body>
+</html>
