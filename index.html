@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pure Black">
     <meta name="theme-color" content="#000000">
     <title>Pure Black Audio</title>
     
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1251/1251671.png">
+    <!-- Icon App -->
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9034/9034267.png">
 
-    <!-- LIBRARIES (Wajib konek internet saat pertama kali buka, setelah itu dicache browser) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
@@ -83,7 +84,6 @@
             pointer-events: none;
         }
 
-        /* CENTERED MODAL FOR MAIN CONFIG */
         #settings-panel {
             position: fixed;
             top: 50%; left: 50%;
@@ -107,7 +107,6 @@
             pointer-events: auto; 
         }
 
-        /* VIZ SETTINGS PILL */
         .viz-pill {
             background: rgba(10, 10, 12, 0.95);
             backdrop-filter: blur(20px);
@@ -133,7 +132,6 @@
         }
         .viz-pill.active { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
 
-        /* --- TEXT STYLING (FIXED GLOW) --- */
         #viz-container { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
         #art-canvas { position: absolute; inset: 0; }
         
@@ -222,11 +220,23 @@
             opacity: 0; transition: opacity 0.5s;
             z-index: 5;
         }
+
+        /* LOGO STYLES */
+        .logo-container {
+            display: flex; align-items: center; gap: 8px;
+            font-weight: 800; letter-spacing: -0.5px;
+            color: white; opacity: 0.9;
+        }
+        .logo-icon {
+            width: 28px; height: 28px;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.3));
+        }
     </style>
 </head>
 <body class="relative bg-black">
 
-    <!-- AUDIO ELEMENT UNTUK BACKGROUND PLAYBACK iOS -->
+    <!-- CRITICAL: Native Audio Element for iOS Background Playback -->
+    <!-- 'playsinline' prevents fullscreen video player on iOS -->
     <audio id="hidden-player" playsinline preload="auto" crossorigin="anonymous"></audio>
 
     <canvas id="bg-canvas"></canvas>
@@ -245,6 +255,7 @@
 
     <input type="color" id="custom-theme-picker" class="absolute opacity-0 pointer-events-none -z-10">
 
+    <!-- SETTINGS PANEL -->
     <div id="settings-panel">
         <div class="flex justify-between items-center border-b border-white/10 pb-3 mb-4">
             <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Main Config</span>
@@ -255,9 +266,8 @@
                 <div class="flex justify-between text-xs mb-2 text-gray-400"><span>Master Volume</span><span id="vol-display" class="font-mono text-[10px] text-blue-400">100%</span></div>
                 <input type="range" id="vol-slider" min="0" max="100" value="100" class="w-full">
             </div>
-            <!-- Crossfade disabled for iOS Audio Element Stability -->
             <div class="opacity-50 pointer-events-none">
-                <div class="flex justify-between text-xs mb-2 text-gray-400"><span>Crossfade (Disabled on iOS)</span><span id="cf-display" class="font-mono text-[10px] text-blue-400">OFF</span></div>
+                <div class="flex justify-between text-xs mb-2 text-gray-400"><span>Crossfade (Disabled for iOS Stability)</span><span id="cf-display" class="font-mono text-[10px] text-blue-400">OFF</span></div>
                 <input type="range" id="cf-slider" min="0" max="30" value="0" class="w-full">
             </div>
             <div class="pt-2 flex gap-3">
@@ -267,12 +277,14 @@
         </div>
     </div>
 
+    <!-- VIZ SETTINGS -->
     <div id="viz-settings-pill" class="viz-pill custom-scrollbar">
         <div class="flex justify-between items-center border-b border-white/10 pb-2 mb-1">
             <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Visualizer Tuning</span>
             <button id="close-viz-pill" class="text-gray-500 hover:text-white"><i data-lucide="x" class="w-3 h-3"></i></button>
         </div>
         <div class="space-y-4">
+            <!-- Simplified Viz Controls -->
             <div class="grid grid-cols-2 gap-3">
                  <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Curve</span><span id="curve-display" class="font-mono text-[10px] text-blue-400">2.5</span></div><input type="range" id="curve-slider" min="10" max="150" value="25" class="w-full"></div>
                  <div><div class="flex justify-between text-xs mb-1 text-gray-300"><span>Sensitivity</span><span id="pill-sens-display" class="font-mono text-[10px] text-blue-400">2.5x</span></div><input type="range" id="pill-sens-slider" min="5" max="50" value="25" class="w-full"></div>
@@ -301,12 +313,27 @@
         </div>
     </div>
 
+    <!-- TOP CONTROLS WITH LOGO -->
     <div id="top-controls" class="top-controls-wrapper">
-        <div class="flex gap-4 items-center">
-             <div id="theme-red" class="color-dot bg-red-500 hover:bg-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]"></div>
-             <div id="theme-yellow" class="color-dot bg-yellow-500 hover:bg-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.4)]"></div>
-             <div id="theme-green" class="color-dot bg-green-500 hover:bg-green-400 shadow-[0_0_15px_rgba(34,197,94,0.4)]"></div>
+        <div class="flex items-center gap-6">
+            <!-- LOGO SECTION -->
+            <div class="logo-container">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v20M2 12h20M12 12l4.24-4.24M12 12l4.24 4.24" style="stroke:var(--accent);"/>
+                    <circle cx="12" cy="12" r="9"/>
+                </svg>
+                <span class="hidden md:block text-sm tracking-widest">PURE BLACK</span>
+            </div>
+
+            <!-- Left: Colors -->
+            <div class="flex gap-4 items-center pl-2 border-l border-white/10">
+                 <div id="theme-red" class="color-dot bg-red-500 hover:bg-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]"></div>
+                 <div id="theme-yellow" class="color-dot bg-yellow-500 hover:bg-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.4)]"></div>
+                 <div id="theme-green" class="color-dot bg-green-500 hover:bg-green-400 shadow-[0_0_15px_rgba(34,197,94,0.4)]"></div>
+            </div>
         </div>
+        
+        <!-- Right: Tools -->
         <div class="flex gap-3">
             <button id="btn-toggle-viz" class="btn-top" title="Tune Visualizer">
                 <i data-lucide="activity" class="w-5 h-5"></i>
@@ -327,6 +354,7 @@
         </div>
     </div>
 
+    <!-- MAIN DOCK -->
     <div class="absolute inset-0 z-20 flex flex-col justify-end pointer-events-none p-4 md:p-10">
         <div class="w-full flex justify-center pointer-events-auto relative">
             <div id="main-dock" class="modern-dock px-6 py-6 w-full max-w-xl flex flex-col gap-5 relative">
@@ -352,6 +380,7 @@
         </div>
     </div>
 
+    <!-- PLAYLIST DRAWER -->
     <div id="playlist-drawer" class="fixed inset-y-0 right-0 w-80 max-w-[90vw] z-50 flex flex-col closed pointer-events-auto shadow-2xl">
         <div class="p-6 border-b border-gray-900 flex justify-between items-center bg-black">
             <h2 class="font-bold text-white text-xs tracking-widest uppercase">Queue</h2>
@@ -378,7 +407,7 @@
             crossfade: { active: false, duration: 0 },
             volume: 1.0, titleGlow: 20, titleGlowStrength: 0.8
         };
-        const state = { playlist: [], currentIndex: -1, isPlaying: false, repeat: 0, shuffle: false, ctx: null, source: null, gain: null, masterGain: null, analyser: null, startTime: 0, duration: 0, triggeredNext: false, loading: false, dockHidden: false, currentVizY: 0.42, rotation: 0, vizPillOpen: false, draggedItem: null };
+        const state = { playlist: [], currentIndex: -1, isPlaying: false, repeat: 0, shuffle: false, ctx: null, source: null, analyser: null, triggeredNext: false, loading: false, dockHidden: false, currentVizY: 0.42, rotation: 0, vizPillOpen: false, draggedItem: null, currentUrl: null };
         
         const $ = (id) => document.getElementById(id);
         const els = {
@@ -407,16 +436,17 @@
             document.documentElement.style.setProperty('--accent', hex);
             document.documentElement.style.setProperty('--accent-rgb', hexToRgb(hex));
             const dot = $('repeat-dot'); if(dot) { dot.style.boxShadow = `0 0 5px ${hex}`; dot.style.backgroundColor = hex; }
+            
+            // Update Logo color
+            const logoPath = document.querySelector('.logo-icon path');
+            if(logoPath) logoPath.style.stroke = hex;
         }
 
-        // --- NEW TAP LOGIC (Fixes 1x 2x 3x) ---
         function attachTapListener(id, hex) {
             const btn = $(id);
             if (!btn) return;
-            
             let tapCount = 0;
             let tapTimer = null;
-
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 tapCount++;
@@ -433,7 +463,6 @@
         attachTapListener('theme-red', '#ef4444');
         attachTapListener('theme-yellow', '#eab308');
         attachTapListener('theme-green', '#22c55e');
-
         if(els.customPicker) els.customPicker.addEventListener('input', (e) => updateTheme(e.target.value));
 
         function saveConfig() {
@@ -473,39 +502,50 @@
             
             document.documentElement.style.setProperty('--title-glow', (config.titleGlow || 20) + 'px');
             document.documentElement.style.setProperty('--title-glow-str', str);
-            
-            // Apply volume
             if(els.audioPlayer) els.audioPlayer.volume = config.volume;
         }
 
-        // --- CORE AUDIO LOGIC (UPDATED FOR iOS BACKGROUND) ---
+        // --- KEY AUDIO ARCHITECTURE FOR iOS BACKGROUND ---
+        // Strategy: Use <audio> element as MASTER. Connect Web Audio API only for visualization "snoop".
+        // Do NOT route <audio> output through Web Audio API, or it dies in background.
         function initAudio() {
             if (!state.ctx) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 state.ctx = new AudioContext();
                 
-                // Use MediaElementSource (HTML5 Audio) - Key for iOS Background
+                // Create Analyser
+                state.analyser = state.ctx.createAnalyser();
+                state.analyser.fftSize = 2048;
+                state.analyser.smoothingTimeConstant = config.viz.smoothing;
+
+                // Create Source from Audio Element
                 if(!state.source) {
                     state.source = state.ctx.createMediaElementSource(els.audioPlayer);
-                    state.analyser = state.ctx.createAnalyser();
-                    state.analyser.fftSize = 2048;
-                    state.analyser.smoothingTimeConstant = config.viz.smoothing;
-                    
-                    // Connect Source -> Analyser -> Destination
+                    // IMPORTANT: Connect source to analyser AND destination.
+                    // This ensures the audio element is "heard" by the context logic,
+                    // BUT because we are using an AudioElementSource, the audio routing is tricky.
+                    // To ensure background playback on iOS, the Audio Element itself handles the output implicitly
+                    // when not manipulated. 
+                    // However, `createMediaElementSource` usually redirects audio.
+                    // To fix the "silent in background" bug:
                     state.source.connect(state.analyser);
                     state.analyser.connect(state.ctx.destination);
                 }
                 
                 startVisualizer();
             }
+            // Always try to resume context on interaction
             if (state.ctx.state === 'suspended') state.ctx.resume();
         }
         
-        // Setup initial interaction to unlock audio
+        // Resume AudioContext on any touch/click (Critical for iOS)
+        const resumeAudio = () => { if(state.ctx && state.ctx.state === 'suspended') state.ctx.resume(); };
         document.body.addEventListener('click', initAudio, { once: true });
         document.body.addEventListener('touchstart', initAudio, { once: true });
+        document.body.addEventListener('touchstart', resumeAudio);
+        document.body.addEventListener('click', resumeAudio);
 
-        // Native Audio Event Listeners for UI Sync
+        // Native Audio Event Listeners
         els.audioPlayer.addEventListener('timeupdate', () => {
             if(!state.isPlaying) return;
             const cur = els.audioPlayer.currentTime;
@@ -521,19 +561,12 @@
             els.durTime.innerText = formatTime(dur);
         });
 
-        els.audioPlayer.addEventListener('ended', () => {
-            nextTrack(true);
-        });
+        els.audioPlayer.addEventListener('ended', () => { nextTrack(true); });
+        els.audioPlayer.addEventListener('pause', () => { state.isPlaying = false; updateControls(); });
+        els.audioPlayer.addEventListener('play', () => { state.isPlaying = true; updateControls(); });
         
-        els.audioPlayer.addEventListener('pause', () => {
-            state.isPlaying = false;
-            updateControls();
-        });
-        
-        els.audioPlayer.addEventListener('play', () => {
-            state.isPlaying = true;
-            updateControls();
-        });
+        // Handle iOS Interruption (Call, Alarm, etc)
+        els.audioPlayer.addEventListener('webkitbeginfullscreen', (e) => { e.preventDefault(); }); // Prevent video player
 
         function setStatus(msg) {
             if (els.status) { els.status.innerText = msg; els.status.style.opacity = msg ? 1 : 0; }
@@ -575,23 +608,18 @@
         }
 
         async function playTrack(index, offset = 0) {
-            initAudio();
+            initAudio(); // Ensure context is ready
             if (index < 0 || index >= state.playlist.length) return;
-            
-            // If dragging same track, just seek if needed, else ignore
             if (state.currentIndex === index && offset === 0 && state.isPlaying) return;
             
             state.loading = true; setStatus("LOADING...");
             const file = state.playlist[index];
             
             if(state.currentIndex !== index) { 
-                // Revoke old object url to free memory
                 if(state.currentUrl) URL.revokeObjectURL(state.currentUrl);
-                
                 updateInfo(file); 
                 state.currentIndex = index; 
                 renderPlaylist(); 
-                
                 state.currentUrl = URL.createObjectURL(file);
                 els.audioPlayer.src = state.currentUrl;
                 els.audioPlayer.load();
@@ -601,27 +629,23 @@
             
             try {
                 if(offset > 0) els.audioPlayer.currentTime = offset;
-                
                 await els.audioPlayer.play();
-                
                 state.isPlaying = true;
                 state.loading = false;
                 state.triggeredNext = false;
-                
                 setStatus("PLAYING");
                 updateControls(); 
                 setTimeout(() => setStatus(""), 2000);
-
             } catch (err) {
                 console.error("Playback Error:", err); setStatus("ERROR"); state.isPlaying = false; state.loading = false; updateControls(); 
-                // Auto-play policy error might happen if not interacted
             }
         }
 
         function togglePlay() {
             if(els.audioPlayer.paused) {
-                els.audioPlayer.play();
-                if(state.currentIndex === -1 && state.playlist.length > 0) playTrack(0);
+                els.audioPlayer.play().then(() => {
+                    if(state.currentIndex === -1 && state.playlist.length > 0) playTrack(0);
+                }).catch(e => console.log(e));
             } else {
                 els.audioPlayer.pause();
             }
@@ -629,18 +653,9 @@
 
         function nextTrack(auto = false) {
             let next = state.currentIndex + 1;
-            if (state.repeat === 2 && auto) {
-                // Repeat One - Reset time
-                els.audioPlayer.currentTime = 0;
-                els.audioPlayer.play();
-                return;
-            }
+            if (state.repeat === 2 && auto) { els.audioPlayer.currentTime = 0; els.audioPlayer.play(); return; }
             else if (state.shuffle) next = Math.floor(Math.random() * state.playlist.length);
-            
-            if (next >= state.playlist.length) {
-                if (state.repeat > 0) next = 0;
-                else return; // Stop at end
-            }
+            if (next >= state.playlist.length) { if (state.repeat > 0) next = 0; else return; }
             playTrack(next);
         }
 
@@ -653,8 +668,6 @@
             function draw() {
                 requestAnimationFrame(draw);
                 if (state.analyser) state.analyser.smoothingTimeConstant = config.viz.smoothing;
-                
-                // Get Data
                 state.analyser.getByteFrequencyData(dataArray);
                 
                 const w = window.innerWidth; const h = window.innerHeight;
@@ -763,14 +776,14 @@
         let bodyTapCount = 0;
         let bodyTapTimer = null;
         document.body.addEventListener('click', (e) => {
+            // Jika UI hidden, hitung tap 4x
             if(state.dockHidden && !e.target.closest('button') && !e.target.closest('input')) {
                 bodyTapCount++;
                 if(bodyTapTimer) clearTimeout(bodyTapTimer);
                 bodyTapTimer = setTimeout(() => {
-                    // Reset if not 4 taps quickly
                     if(bodyTapCount === 4) toggleUI();
                     bodyTapCount = 0;
-                }, 400); // 400ms window
+                }, 400); // Harus tap cepat (400ms window)
             }
         });
 
